@@ -6,6 +6,26 @@
 
 (in-package #:org.shirakumo.filesystem-utils)
 
+;;; Support
+#+(and sbcl win32)
+(defun string->wstring (string)
+  (let* ((count (sb-alien:alien-funcall (sb-alien:extern-alien "MultiByteToWideChar" (function int int int32 sb-alien:c-string int * int))
+                                        65001 0 string -1 0 0))
+         (ptr (sb-alien:make-alien char count)))
+    (sb-alien:alien-funcall (sb-alien:extern-alien "MultiByteToWideChar" (function int int int32 sb-alien:c-string int * int))
+                            65001 0 string -1 ptr 0)
+    ptr))
+
+#+(and sbcl win32)
+(defun wstring->string (ptr)
+  (let ((count (sb-alien:alien-funcall (sb-alien:extern-alien "WideCharToMultiByte" (function int int int32 * int * int * *))
+                                       65001 0 pointer -1 0 0 0 0)))
+    (sb-alien:with-alien ((string (array char count)))
+      (sb-alien:alien-funcall (sb-alien:extern-alien "WideCharToMultiByte" (function int int int32 sb-alien:c-string int * int))
+                              65001 0 pointer -1 string count 0 0)
+      (sb-alien:cast string sb-alien:c-string))))
+
+
 (defun runtime-directory ()
   (pathname-utils:to-directory
    (pathname-utils:parse-native-namestring
@@ -152,10 +172,24 @@
           collect (pathname-utils:force-directory path))))
 
 (defun list-hosts ()
-  )
+  (list (pathname-host *default-pathname-defaults*)))
 
 (defun list-devices (&optional host)
-  )
+  (declare (ignore host))
+  #+(or windows win32 ms-windows)
+  (progn
+    #+sbcl (sb-alien:with-alien ((strings (array short 1024)))
+             (let ((count (sb-alien:alien-funcall (sb-alien:extern-alien "QueryDosDeviceW" (function int32 * * int32))
+                                                  0 strings 1024))
+                   (start 0)
+                   (devices ()))
+               (dotimes (i count devices)
+                 (cond ((/= 0 (sb-alien:deref strings i)))
+                       ((= start i) (return devices))
+                       (T
+                        (push (wstring->string (sb-alien:int-sap (+ (sb-alien:alien-sap strings)
+                                                                    (* 2 start))))
+                              devices))))))))
 
 (defun resolve-symbolic-links (pathname)
   #-allegro
@@ -200,7 +234,14 @@
             (namestring (merge-pathnames (resolve-symbolic-links (pathname-utils:to-directory file)) file))))
 
 (defun create-symbolic-link (link-file destination-file)
-  )
+  #+(and sbcl unix) (sb-posix:symlink destination-file link-file)
+  #+(and sbcl win32) (let ((src (string->wstring (pathname-utils:native-namestring link-file)))
+                           (dst (string->wstring (pathname-utils:native-namestring destination-file))))
+                       (unwind-protect (sb-alien:alien-funcall (sb-alien:extern-alien "CreateSymbolicLinkW" (function int * * int))
+                                                               (sb-alien:addr src) (sb-alien:addr dst) (if (directory-p destination-file) #x3 #x2))
+                         (sb-alien:free-alien src)
+                         (sb-alien:free-alien dst)))
+  #-sbcl (error "Cannot create symbolic links."))
 
 (defun rename-file* (file to)
   (let ((file (pathname-utils:to-physical file))
