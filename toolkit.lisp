@@ -9,22 +9,22 @@
 ;;; Support
 #+(and sbcl win32)
 (defun string->wstring (string)
-  (let* ((count (sb-alien:alien-funcall (sb-alien:extern-alien "MultiByteToWideChar" (function int int int32 sb-alien:c-string int * int))
+  (let* ((count (sb-alien:alien-funcall (sb-alien:extern-alien "MultiByteToWideChar" (function sb-alien:int sb-alien:int (integer 32) sb-alien:c-string sb-alien:int sb-alien:int sb-alien:int))
                                         65001 0 string -1 0 0))
-         (ptr (sb-alien:make-alien char count)))
-    (sb-alien:alien-funcall (sb-alien:extern-alien "MultiByteToWideChar" (function int int int32 sb-alien:c-string int * int))
-                            65001 0 string -1 ptr 0)
+         (ptr (sb-alien:make-alien sb-alien:short count)))
+    (sb-alien:alien-funcall (sb-alien:extern-alien "MultiByteToWideChar" (function sb-alien:int sb-alien:int (integer 32) sb-alien:c-string sb-alien:int (* T) sb-alien:int))
+                            65001 0 string -1 ptr count)
     ptr))
 
 #+(and sbcl win32)
-(defun wstring->string (ptr)
-  (let ((count (sb-alien:alien-funcall (sb-alien:extern-alien "WideCharToMultiByte" (function int int int32 * int * int * *))
-                                       65001 0 pointer -1 0 0 0 0)))
-    (sb-alien:with-alien ((string (array char count)))
-      (sb-alien:alien-funcall (sb-alien:extern-alien "WideCharToMultiByte" (function int int int32 sb-alien:c-string int * int))
-                              65001 0 pointer -1 string count 0 0)
-      (sb-alien:cast string sb-alien:c-string))))
-
+(defun wstring->string (pointer)
+  (let* ((count (sb-alien:alien-funcall (sb-alien:extern-alien "WideCharToMultiByte" (function sb-alien:int sb-alien:int (integer 32) (* T) sb-alien:int sb-alien:int sb-alien:int sb-alien:int sb-alien:int))
+                                        65001 0 pointer -1 0 0 0 0))
+         (string (sb-alien:make-alien sb-alien:char count)))
+    (sb-alien:alien-funcall (sb-alien:extern-alien "WideCharToMultiByte" (function sb-alien:int sb-alien:int (integer 32) (* T) sb-alien:int (* T) sb-alien:int sb-alien:int sb-alien:int))
+                            65001 0 pointer -1 string count 0 0)
+    (prog1 (sb-alien:cast string sb-alien:c-string)
+      (sb-alien:free-alien string))))
 
 (defun runtime-directory ()
   (pathname-utils:to-directory
@@ -100,7 +100,7 @@
     (setf *default-pathname-defaults* pathname)
     pathname))
 
-(defun call-with-changed-directory (function directory)
+(defun call-with-current-directory (function directory)
   (let ((current (current-directory)))
     (if (pathname-utils:pathname-equal current directory)
         (funcall function)
@@ -109,8 +109,8 @@
           (unwind-protect (funcall function)
             (setf (current-directory) current))))))
 
-(defmacro with-changed-directory ((directory) &body body)
-  `(call-with-changed-directory (lambda () ,@body) ,directory))
+(defmacro with-current-directory ((directory) &body body)
+  `(call-with-current-directory (lambda () ,@body) ,directory))
 
 (defun ensure-deleted (pathname)
   (when (file-exists-p pathname)
@@ -172,24 +172,23 @@
           collect (pathname-utils:force-directory path))))
 
 (defun list-hosts ()
-  (list (pathname-host *default-pathname-defaults*)))
+  (when (pathname-host *default-pathname-defaults*)
+    (list (pathname-host *default-pathname-defaults*))))
 
 (defun list-devices (&optional host)
   (declare (ignore host))
   #+(or windows win32 ms-windows)
   (progn
-    #+sbcl (sb-alien:with-alien ((strings (array short 1024)))
-             (let ((count (sb-alien:alien-funcall (sb-alien:extern-alien "QueryDosDeviceW" (function int32 * * int32))
-                                                  0 strings 1024))
+    #+sbcl (sb-alien:with-alien ((strings (array (integer 16) 1024)))
+             (let ((count (sb-alien:alien-funcall (sb-alien:extern-alien "GetLogicalDriveStringsW" (function (integer 32) (integer 32) (array (integer 16) NIL)))
+                                                  1024 strings))
+                   (base (sb-sys:sap-int (sb-alien:alien-sap strings)))
                    (start 0)
                    (devices ()))
                (dotimes (i count devices)
-                 (cond ((/= 0 (sb-alien:deref strings i)))
-                       ((= start i) (return devices))
-                       (T
-                        (push (wstring->string (sb-alien:int-sap (+ (sb-alien:alien-sap strings)
-                                                                    (* 2 start))))
-                              devices))))))))
+                 (when (= 0 (sb-alien:deref strings i))
+                   (push (string-right-trim ":\\" (wstring->string (sb-sys:int-sap (+ base (* 2 start))))) devices)
+                   (setf start (1+ i))))))))
 
 (defun resolve-symbolic-links (pathname)
   #-allegro
