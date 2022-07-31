@@ -34,7 +34,7 @@ See TEMPORARY-DIRECTORY
 See WITH-TEMPORARY-FILE")
   
   (function with-temporary-file
-    "Execute BODY with a temporary file pathname bout to PATH.
+    "Execute BODY with a temporary file pathname bound to PATH.
 
 ARGS are passed on to MAKE-TEMPORARY-FILE.
 The file is automatically deleted when BODY exits for any reason.
@@ -137,8 +137,8 @@ See PATHNAME-UTILS:DIRECTORY-P")
 
 This differs from PATHNAME-UTILS:FILE-P in the following way:
 If the pathname is a file pathname, but points to a file that is not a
-regular file (and thus a directory, device, or other type of file
-node), then this function returns NIL.
+regular file (and thus a directory, device, symlink, or other type of
+file node), then this function returns NIL.
 
 See PATHNAME-UTILS:FILE-P")
   
