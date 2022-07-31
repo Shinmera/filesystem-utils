@@ -52,10 +52,12 @@
        #-windows "/tmp")
    :as :directory))
 
-(defun make-temporary-file (&key (name (format NIL "~36r-~36r" (get-universal-time) (random #xFFFFFFFFFFFFFFFF))) (type "dat"))
-  (make-pathname :name name
-                 :type type
-                 :defaults (tempdir)))
+(defun make-temporary-file (&key (name NIL name-p) (type "dat"))
+  (if name-p
+      (make-pathname :name name :type type :defaults (temporary-directory))
+      (loop for path = (make-pathname :name (format NIL "~36r-~36r" (get-universal-time) (random #xFFFFFFFFFFFFFFFF))
+                                      :type type :defaults (temporary-directory))
+            do (unless (file-exists-p path) (return path)))))
 
 (defun call-with-temporary-file (function &rest args)
   (let ((path (apply #'make-temporary-file args)))
@@ -253,9 +255,11 @@
                  #+(or clasp clisp clozure ecl) :if-exists
                  #+clozure :rename-and-delete #+(or clasp ecl) t)))
 
-(defun copy-file (file to &key replace)
-  (cond ((pathname-utils:directory-p file)
-         (let ((to (pathname-utils:subdirectory to (pathname-utils:directory-name file))))
+(defun copy-file (file to &key replace skip-root)
+  (cond ((directory-p file)
+         (let ((to (if skip-root
+                       to
+                       (pathname-utils:subdirectory to (pathname-utils:directory-name file)))))
            (ensure-directories-exist to)
            (dolist (file (list-contents file))
              (copy-file file to :replace replace))))
