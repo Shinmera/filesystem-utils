@@ -91,10 +91,13 @@
 (define-test symbolic-links
   :parent filesystem-utils
   (skip-on ((not :sbcl)) "Can't test symbolic-link functions as we have no way of establishing them."
-    (finish (fs:create-symbolic-link (fs:current-directory)))
-    (finish (fs:directory* *here*))
-    (finish (fs:symbolic-link-p (fs:current-directory)))
-    (finish (fs:resolve-symbolic-links (fs:current-directory)))))
+    (fs:with-temporary-file (file)
+      (let ((target (make-pathname :name "test" :type "lisp" :defaults *here*)))
+        (finish (fs:create-symbolic-link file target))
+        (false (find target (fs:directory* (merge-pathnames pu:*wild-file* (fs:temporary-directory))) :test #'pu:pathname=))
+        (false (fs:symbolic-link-p target))
+        (true (fs:symbolic-link-p file))
+        (is pu:pathname= target (fs:resolve-symbolic-links file))))))
 
 (define-test rename
   :parent filesystem-utils)
