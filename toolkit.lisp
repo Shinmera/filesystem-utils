@@ -145,11 +145,13 @@
   (apply #'directory directory args))
 
 (defun list-contents (directory)
-  (directory* (merge-pathnames pathname-utils:*wild-path* directory)))
+  ;; FIXME: This sucks
+  (nconc (list-files directory)
+         (list-directories directory)))
 
 (defun list-files (directory)
-  (let ((directory (pathname-utils:pathname* directory))
-        (entries (ignore-errors (directory* (merge-pathnames pathname-utils:*wild-file* directory)))))
+  (let* ((directory (pathname-utils:pathname* directory))
+         (entries (ignore-errors (directory* (merge-pathnames pathname-utils:*wild-file* directory)))))
     (remove-if #'directory-p entries)))
 
 (defun list-directories (directory)
@@ -168,10 +170,10 @@
                         (fs:directory-not-found () nil))
              #+clozure (ignore-errors (directory* wild :directories T :files NIL))
              #+mcl (ignore-errors (directory* wild :directories T))
-             #-(or abcl xcl cormanlisp genera clozure mcl) (directory* wild))))
-    (loop for path in dirs
-          when (directory-p path)
-          collect (pathname-utils:force-directory path))))
+             #-(or abcl xcl cormanlisp genera clozure mcl) (directory* wild)))
+      (loop for path in dirs
+            when (directory-p path)
+            collect (pathname-utils:force-directory path)))))
 
 (defun list-hosts ()
   (when (pathname-host *default-pathname-defaults*)
@@ -195,7 +197,7 @@
 (defun resolve-symbolic-links (pathname)
   #-allegro
   (if (or (typep pathname 'logical-pathname)
-          (not (absolute-pathname-p pathname)))
+          (not (pathname-utils:absolute-p pathname)))
       pathname
       (or (file-exists-p pathname)
           (pathname-utils:normalize-pathname pathname)))

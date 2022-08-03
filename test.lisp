@@ -41,7 +41,7 @@
   :parent filesystem-utils
   (true (pu:file-p (fs:make-temporary-file)))
   (is string= "abc" (pathname-name (fs:make-temporary-file :name "abc")))
-  (is string= "abc" (pathname-name (fs:make-temporary-file :type "abc")))
+  (is string= "abc" (pathname-type (fs:make-temporary-file :type "abc")))
   (isnt pu:pathname= (fs:make-temporary-file) (fs:make-temporary-file))
   (let (file)
     (fs:with-temporary-file (tempfile)
