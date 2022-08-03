@@ -17,11 +17,19 @@
 
 (define-test filesystem-utils)
 
-(defun create-file (file)
+(defun create-file (file &optional (contents "a"))
   (with-open-file (stream file
                           :direction :output
                           :if-exists :error)
-    (write-string "a" stream)))
+    (write-string contents stream)))
+
+(defun file-contents (file)
+  (with-open-file (stream file)
+    (with-output-to-string (out)
+      (loop with buf = (make-string 4096)
+            for read = (read-sequence buf stream)
+            while (< 0 read)
+            do (write-sequence buf out :end read)))))
 
 (define-test directories
   :parent filesystem-utils
@@ -100,7 +108,17 @@
         (is pu:pathname= target (fs:resolve-symbolic-links file))))))
 
 (define-test rename
-  :parent filesystem-utils)
+  :parent filesystem-utils
+  (fs:with-temporary-file (a)
+    (finish (create-file a "a"))
+    (true (fs:file-exists-p a))
+    (fs:with-temporary-file (b)
+      (finish (create-file b "b"))
+      (true (fs:file-exists-p b))
+      (finish (fs:rename-file* a b))
+      (true (fs:file-exists-p b))
+      (false (fs:file-exists-p a))
+      (is string= "a" (file-contents b)))))
 
 (define-test copy
   :parent filesystem-utils)
