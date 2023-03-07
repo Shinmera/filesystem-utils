@@ -30,4 +30,6 @@
    #:symbolic-link-p
    #:create-symbolic-link
    #:rename-file*
-   #:copy-file))
+   #:copy-file
+   #:delete-directory
+   #:delete-file*))

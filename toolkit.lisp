@@ -116,7 +116,7 @@
 
 (defun ensure-deleted (pathname)
   (when (file-exists-p pathname)
-    (delete-file pathname)))
+    (delete-file* pathname)))
 
 (defun truename* (pathname)
   (let ((pathname (pathname-utils:pathname* pathname)))
@@ -285,3 +285,31 @@
                    (loop for read = (read-sequence buffer in)
                          while (< 0 read)
                          do (write-sequence buffer out :end read))))))))))
+
+(defun delete-directory (file)
+  #+allegro (excl.osi:delete-directory-and-files file :if-does-not-exist NIL)
+  #+clozure (ccl:delete-directory directory-pathname)
+  #+genera (fs:delete-directory directory-pathname :confirm nil)
+  #+sbcl (sb-ext:delete-directory file :recursive T)
+  #-(or allegro clozure genera sbcl)
+  (progn
+    (dolist (file (list-contents file))
+      (delete-file* file))
+    #+clisp (ext:delete-directory file)
+    #+(or cmucl scl) (multiple-value-bind (ok errno)
+                         (unix:unix-rmdir (native-namestring file))
+                       (unless ok
+                         #+cmucl (error "Error number ~A when trying to delete directory ~A" errno file)
+                         #+scl (error "~@<Error deleting ~S: ~A~@:>" file (unix:get-unix-error-msg errno))))
+    #+cormanlisp (win32:delete-directory file)
+    #+(or clasp ecl) (si:rmdir file)
+    #+lispworks (lw:delete-directory file)
+    #+mkcl (mkcl:rmdir file)
+    #-(or clisp cmucl scl cormanlisp clasp ecl lispworks mkcl)
+    (delete-file file)))
+
+(defun delete-file* (file)
+  (cond ((directory-p file)
+         (delete-directory file))
+        (T
+         (delete-file file))))

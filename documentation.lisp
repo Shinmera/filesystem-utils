@@ -63,7 +63,8 @@ See CURRENT-DIRECTORY")
   (function ensure-deleted
     "Deletes the given file if it still exists.
 
-See FILE-EXISTS-P")
+See FILE-EXISTS-P
+See DELETE-FILE*")
   
   (function truename*
     "Like TRUENAME but ensures that it works on directory files as well on every implementation.")
@@ -176,4 +177,23 @@ REPLACE may be one of:
 When FILE is a directory, all children are copied to the target. If
 SKIP-ROOT is NIL, then the directory-name of FILE is replicated as the
 root of all contents within TO. Otherwise, the contents of FILE are
-copied directly to TO."))
+copied directly to TO.")
+
+  (function delete-directory
+    "Deletes the given directory.
+
+Will recursively delete files within the directory.
+This will *not* follow symbolic links, and instead
+delete the link file itself.
+
+See DELETE-FILE*")
+
+  (function delete-file*
+    "Deletes the given file.
+
+Will recursively delete files if they are directories.
+This will *not* follow symbolic links.
+
+See CL:DELETE-FILE
+See DELETE-DIRECTORY
+See DIRECTORY-P"))
