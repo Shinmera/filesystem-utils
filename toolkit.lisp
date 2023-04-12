@@ -228,9 +228,9 @@
 
 (defun symbolic-link-p (file)
   #+clozure (ccl::path-is-link file)
-  #+cmucl (= #o120000 (logand #o170000 (nth-value 3 (unix:unix-stat (namestring file)))))
+  #+cmucl (= #o120000 (logand #o170000 (nth-value 3 (unix:unix-stat (pathname-utils:native-namestring file)))))
   #+(or clasp ecl mkcl) (eql :link (ext:file-kind file NIL))
-  #+sbcl (eql :symlink (sb-impl::native-file-kind (namestring (truename file))))
+  #+sbcl (eql :symlink (sb-impl::native-file-kind (pathname-utils:native-namestring file)))
   ;; Try to guess by resolving the file and the directory of it separately.
   #-(or clasp clozure ecl cmucl mkcl sbcl)
   (string/= (namestring (resolve-symbolic-links file))
