@@ -156,8 +156,11 @@ This may signal an error for a variety of reasons:
   (function rename-file*
     "Renames FILE to TO, overwriting TO if it exists.
 
-Like RENAME-FILE on most implementations, but ensures the destination
-is overwritten if it exists.")
+Similar RENAME-FILE on most implementations, but ensures the destination
+is overwritten if it exists, and does *not* merge the pathname name or
+type of the FILE pathname with that of TO. In effect this means it
+does what you'd expect, and if TO has no name or type, but FILE does,
+they are removed by the rename.")
   
   (function copy-file
     "Copies the file from FILE to TO.

@@ -243,7 +243,8 @@
 
 (defun rename-file* (file to)
   (let ((file (pathname-utils:to-physical file))
-        (to (pathname-utils:to-physical to)))
+        (to (merge-pathnames (pathname-utils:to-physical to)
+                             (make-pathname :name :unspecific :type :unspecific))))
     #+clisp
     (progn (funcall 'require "syscalls")
            (funcall (find-symbol (string :copy-file) :posix) file to :method :rename))
