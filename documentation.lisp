@@ -107,7 +107,16 @@ This may return NIL if the implementation cannot enumerate the hosts.")
 The HOST may be given as a hint for devices to list under the given
 host. The implementation may disregard this hint, however.
 
-This may return NIL if the implementation cannot enumerate the devices.")
+This may return NIL if the implementation cannot enumerate the
+devices.")
+
+  (function device
+    "Attempts to fetch an identifier for the actual device this file is on.
+
+The returned identifier is opaque and may not be user-readable. The
+primary purpose is to verify whether files reside on the same device
+or not. Two files reside on the same device if their DEVICE return
+values are EQUAL.")
   
   (function resolve-symbolic-links
     "Resolve symbolic links in the pathname as much as possible.
@@ -160,7 +169,11 @@ Similar RENAME-FILE on most implementations, but ensures the destination
 is overwritten if it exists, and does *not* merge the pathname name or
 type of the FILE pathname with that of TO. In effect this means it
 does what you'd expect, and if TO has no name or type, but FILE does,
-they are removed by the rename.")
+they are removed by the rename.
+
+Additionally, it does what you expect if the two pathnames are across
+devices, namely it will copy the file over and delete the old one,
+rather than signalling an error.")
   
   (function copy-file
     "Copies the file from FILE to TO.

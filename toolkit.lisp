@@ -188,6 +188,12 @@
                    (push (string-right-trim ":\\" (wstring->string (sb-sys:int-sap (+ base (* 2 start))))) devices)
                    (setf start (1+ i))))))))
 
+(defun device (pathname)
+  (or (pathname-device pathname)
+      ;; FIXME: Implement on more implementations
+      #+(or posix linux bsd)
+      #+sbcl (sb-posix:stat-dev (sb-posix:stat pathname))))
+
 (defun resolve-symbolic-links (pathname)
   #-allegro
   (if (or (typep pathname 'logical-pathname)
@@ -245,13 +251,19 @@
   (let ((file (pathname-utils:to-physical file))
         (to (merge-pathnames (pathname-utils:to-physical to)
                              (make-pathname :name :unspecific :type :unspecific))))
-    #+clisp
-    (progn (funcall 'require "syscalls")
-           (funcall (find-symbol (string :copy-file) :posix) file to :method :rename))
-    #-clisp
-    (rename-file file to
-                 #+(or clasp clisp clozure ecl) :if-exists
-                 #+clozure :rename-and-delete #+(or clasp ecl) t)))
+    (cond ((pathname-utils:pathname= file to))
+          ((equal (device file) (device to))
+           #+clisp
+           (progn (funcall 'require "syscalls")
+                  (funcall (find-symbol (string :copy-file) :posix) file to :method :rename))
+           #-clisp
+           (rename-file file to
+                        #+(or clasp clisp clozure ecl) :if-exists
+                        #+clozure :rename-and-delete #+(or clasp ecl) t))
+          (T
+           (copy-file file to :replace T)
+           (ensure-deleted file)))
+    to))
 
 (defun copy-file (file to &key replace skip-root)
   (cond ((directory-p file)

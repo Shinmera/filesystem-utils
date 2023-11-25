@@ -18,6 +18,7 @@
    #:list-directories
    #:list-hosts
    #:list-devices
+   #:device
    #:resolve-symbolic-links
    #:directory-p
    #:file-p
