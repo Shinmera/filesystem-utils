@@ -274,9 +274,11 @@
            (dolist (file (list-contents file))
              (copy-file file to :replace replace))))
         (T
-         (let ((to (make-pathname :name (pathname-name file)
-                                  :type (pathname-type file)
-                                  :defaults to)))
+         (let ((to (if (and (null (pathname-name to)) (null (pathname-type to)))
+                       (make-pathname :name (pathname-name file)
+                                      :type (pathname-type file)
+                                      :defaults to)
+                       to)))
            (when (or (not (file-exists-p to))
                      (ecase replace
                        ((T) T)

@@ -187,7 +187,10 @@ REPLACE may be one of:
 When FILE is a directory, all children are copied to the target. If
 SKIP-ROOT is NIL, then the directory-name of FILE is replicated as the
 root of all contents within TO. Otherwise, the contents of FILE are
-copied directly to TO.")
+copied directly to TO.
+
+If TO does not have a pathname-name or pathname-type, then FILE's
+pathname-name and pathname-type are used.")
 
   (function delete-directory
     "Deletes the given directory.
