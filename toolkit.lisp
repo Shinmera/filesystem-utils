@@ -192,7 +192,7 @@
   (or (pathname-device pathname)
       ;; FIXME: Implement on more implementations
       #+(or posix linux bsd)
-      #+sbcl (sb-posix:stat-dev (sb-posix:stat pathname))))
+      (progn #+sbcl (sb-posix:stat-dev (sb-posix:stat pathname)))))
 
 (defun resolve-symbolic-links (pathname)
   #-allegro
