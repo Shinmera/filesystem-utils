@@ -240,6 +240,7 @@
             (namestring (merge-pathnames (resolve-symbolic-links (pathname-utils:to-directory file)) file))))
 
 (defun create-symbolic-link (link-file destination-file)
+  #-sbcl (declare (ignore link-file destination-file))
   #+(and sbcl unix) (sb-posix:symlink destination-file link-file)
   #+(and sbcl win32) (let ((src (string->wstring (pathname-utils:native-namestring link-file)))
                            (dst (string->wstring (pathname-utils:native-namestring destination-file))))
