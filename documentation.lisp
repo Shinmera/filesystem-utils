@@ -192,6 +192,11 @@ copied directly to TO.
 If TO does not have a pathname-name or pathname-type, then FILE's
 pathname-name and pathname-type are used.")
 
+  (function empty-directory-p
+    "Returns true if the file is a directory and is empty.
+
+See DIRECTORY-P")
+
   (function delete-directory
     "Deletes the given directory.
 

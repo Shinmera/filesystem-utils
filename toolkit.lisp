@@ -299,6 +299,11 @@
                          while (< 0 read)
                          do (write-sequence buffer out :end read))))))))))
 
+(defun empty-directory-p (file)
+  (and (directory-p file)
+       ;; FIXME: this sucks and is slow if the directory is very much not empty.
+       (null (directory (merge-pathnames pathname-utils:*wild-file* file)))))
+
 (defun delete-directory (file)
   #+allegro (excl.osi:delete-directory-and-files file :if-does-not-exist NIL)
   #+clozure (ccl:delete-directory directory-pathname)

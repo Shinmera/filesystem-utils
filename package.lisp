@@ -26,5 +26,6 @@
    #:create-symbolic-link
    #:rename-file*
    #:copy-file
+   #:empty-directory-p
    #:delete-directory
    #:delete-file*))
