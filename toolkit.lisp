@@ -200,7 +200,7 @@
                                    (file ()
                                      (when (or (eql type T) (eql type :file))
                                        ;; TODO: we concat two strings here, it'd be a lot faster to only cons up one
-                                       (funcall function (format NIL "~a/~a" (fd-path fd) (dirent-path entry))))))
+                                       (funcall function (format NIL "~a~a" (fd-path fd) (dirent-path entry))))))
                             (case (dirent-type entry)
                               (0 ; Unknown, need to probe the actual file
                                (let ((inner (cffi:foreign-funcall "openat" :int fd :pointer name :int 592128 :int)))
@@ -233,17 +233,33 @@
          ,return))))
 
 (defun list-contents (directory)
-  ;; FIXME: This sucks
-  (nconc (list-files directory)
-         (list-directories directory)))
+  (let ((directory (pathname-utils:to-directory directory)))
+    #+cffi
+    (let ((files ()))
+      (do-directory (file directory :type T :return files)
+        (push (pathname-utils:parse-native-namestring file) files)))
+    #-cffi
+    (nconc (list-files directory)
+           (list-directories directory))))
 
 (defun list-files (directory)
-  (let* ((directory (pathname-utils:pathname* directory))
-         (entries (ignore-errors (directory* (merge-pathnames pathname-utils:*wild-file* directory)))))
-    (remove-if #'directory-p entries)))
+  (let ((directory (pathname-utils:to-directory directory)))
+    #+cffi
+    (let ((files ()))
+      (do-directory (file directory :type :file :return files)
+        (push (pathname-utils:parse-native-namestring file) files)))
+    #-cffi
+    (let* ((directory (pathname-utils:pathname* directory))
+           (entries (ignore-errors (directory* (merge-pathnames pathname-utils:*wild-file* directory)))))
+      (remove-if #'directory-p entries))))
 
 (defun list-directories (directory)
-  (let* ((directory (pathname-utils:to-directory directory)))
+  (let ((directory (pathname-utils:to-directory directory)))
+    #+cffi
+    (let ((files ()))
+      (do-directory (file directory :type :directory :return files)
+        (push (pathname-utils:parse-native-namestring file) files)))
+    #-cffi
     (let* (#-(or abcl cormanlisp genera xcl)
            (wild (merge-pathnames
                   #-(or abcl allegro cmucl lispworks sbcl scl xcl)
