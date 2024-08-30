@@ -1,20 +1,27 @@
 (in-package #:org.shirakumo.filesystem-utils)
 
 ;;; Support
-#+cffi
+#+(and windows cffi)
 (defun wstring->string (pointer &optional (chars -1))
   (let ((bytes (cffi:foreign-funcall "WideCharToMultiByte" :int 65001 :int32 0 :pointer pointer :int chars :pointer (cffi:null-pointer) :int 0 :pointer (cffi:null-pointer) :pointer (cffi:null-pointer) :int)))
     (cffi:with-foreign-object (string :uchar bytes)
       (cffi:foreign-funcall "WideCharToMultiByte" :int 65001 :int32 0 :pointer pointer :int chars :pointer string :int bytes :pointer (cffi:null-pointer) :pointer (cffi:null-pointer) :int)
       (let ((babel::*suppress-character-coding-errors* T))
         (cffi:foreign-string-to-lisp string :encoding :utf-8)))))
-#+cffi
+
+#+(and windows cffi)
 (defun string->wstring (string &optional buffer)
   (cffi:with-foreign-string (string string)
     (let* ((chars (cffi:foreign-funcall "MultiByteToWideChar" :int 65001 :int32 0 :pointer string :int -1 :pointer (cffi:null-pointer) :int 0 :int))
            (pointer (or buffer (cffi:foreign-alloc :uint16 :count chars))))
       (cffi:foreign-funcall "MultiByteToWideChar" :int 65001 :int32 0 :pointer string :int -1 :pointer pointer :int chars :int)
       pointer)))
+
+#+(and windows cffi)
+(defmacro with-wstring ((var string) &body body)
+  `(let ((,var (string->wstring ,string)))
+     (unwind-protect (let ((,var ,var)) ,@body)
+       (cffi:foreign-free ,var))))
 
 (defun runtime-directory ()
   (pathname-utils:to-directory
@@ -134,7 +141,7 @@
   #-(or allegro clozure digitool clisp cmucl scl lispworks sbcl)
   (apply #'directory directory args))
 
-#+cffi
+#+(and unix cffi)
 (cffi:defcstruct (dirent :class dirent :conc-name dirent-)
   (inode :size)
   (offset :size)
@@ -142,7 +149,7 @@
   (type :uint8)
   (name :char))
 
-#+cffi
+#+(and unix cffi)
 (defun dirent-path (entry)
   (declare (type cffi:foreign-pointer entry))
   (declare (optimize speed (safety 0)))
@@ -165,7 +172,7 @@
                (and (= (char-code #\.) (cffi:mem-aref name :char 1))
                     (= 0 (cffi:mem-aref name :char 2)))))))
 
-#+cffi
+#+(and unix cffi)
 (defun fd-path (fd)
   (declare (type fixnum fd))
   (declare (optimize speed (safety 0)))
@@ -177,6 +184,24 @@
           (setf (char str (1- (length str))) #-windows #\/ #+windows #\\)
           str)))))
 
+#+(and windows cffi)
+(cffi:defcstruct (find-data :conc-name find-data-)
+  (attributes :uint32)
+  (creation-time :uint64)
+  (access-time :uint64)
+  (write-time :uint64)
+  (size :uint32)
+  (reserved-0 :uint32)
+  (reserved-1 :uint32)
+  (name :uint16 :count 260)
+  (alternate-name :uint16 :count 14))
+
+#+(and windows cffi)
+(defun find-path (data)
+  (declare (type cffi:foreign-pointer data))
+  (declare (optimize speed (safety 0)))
+  (wstring->string (cffi:foreign-slot-pointer data '(:struct find-data) 'name)))
+
 (defun map-directory (function path &key (type T) recursive)
   #-cffi
   (dolist (entry (if recursive
@@ -186,7 +211,32 @@
               (and (eql :directory type) (directory-p entry))
               (and (eql :file type) (file-p entry)))
       (funcall function entry)))
-  #+cffi
+  #+(and cffi windows)
+  (cffi:with-foreign-objects ((data '(:struct find-data)))
+    (labels ((mapdir (path)
+               (let ((handle (with-wstring (path (format NIL "\\\\?\\~a*" path))
+                               (cffi:foreign-funcall "FindFirstFileW" :pointer path :pointer data :pointer))))
+                 (when (= (cffi:pointer-address handle) (1- (ash 1 64)))
+                   (error "The file does not exist or is not accessible:~%  ~a" path))
+                 (unwind-protect
+                      (loop for attributes = (find-data-attributes data)
+                            unless (dotpathp (cffi:foreign-slot-pointer data '(:struct find-data) 'name))
+                            do (cond ((logbitp 4 attributes) ; Directory
+                                      (when (or (eql type T) (eql type :directory))
+                                        (funcall function (format NIL "~a~a\\" path (find-path data))))
+                                      (when recursive
+                                        (mapdir (format NIL "~a~a\\" path (find-path data)))))
+                                     ((logbitp 6 attributes) ; Device file
+                                      NIL)
+                                     ((logbitp 16 attributes) ; Virtual
+                                      NIL)
+                                     (T
+                                      (when (or (eql type T) (eql type :file))
+                                        (funcall function (format NIL "~a~a" path (find-path data))))))
+                            while (cffi:foreign-funcall "FindNextFileW" :pointer handle :pointer data :bool))
+                   (cffi:foreign-funcall "FindClose" :pointer handle)))))
+      (mapdir (pathname-utils:native-namestring path))))
+  #+(and cffi unix)
   (labels ((mapdir (fd dir)
              (loop for entry = (cffi:foreign-funcall "readdir" :pointer dir :pointer)
                    until (cffi:null-pointer-p entry)
