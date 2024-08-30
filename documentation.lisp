@@ -88,7 +88,8 @@ TYPE governs for which kinds of file entries the function is called.
   :DIRECTORY --- Only directory entries
 
 No guarantees are made about the order in which file entries are
-mapped.
+mapped. Directory entries are guaranteed to be terminated by the
+platform directory separator.
 
 On platforms with CFFI support this is usually far more efficient than
 using the DIRECTORY function with a wild pathname, especially if

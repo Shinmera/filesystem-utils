@@ -173,7 +173,9 @@
     (cffi:foreign-funcall "snprintf" :pointer path :size 1024 :string "/proc/self/fd/%i" :int fd)
     (let ((size (cffi:foreign-funcall "readlink" :pointer path :pointer path :size 1024 :int)))
       (when (< 0 size)
-        (cffi:foreign-string-to-lisp path :count size)))))
+        (let ((str (cffi:foreign-string-to-lisp path :count (1+ size))))
+          (setf (char str (1- (length str))) #-windows #\/ #+windows #\\)
+          str)))))
 
 (defun map-directory (function path &key (type T) recursive)
   #-cffi
