@@ -14,5 +14,6 @@
   :depends-on (:trivial-features
                :pathname-utils
                :documentation-utils
+               (:feature (:not :mezzano) :cffi)
                (:feature :sbcl :sb-posix))
   :in-order-to ((asdf:test-op (asdf:test-op :filesystem-utils-test))))

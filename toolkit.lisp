@@ -1,24 +1,20 @@
 (in-package #:org.shirakumo.filesystem-utils)
 
 ;;; Support
-#+(and sbcl win32)
-(defun string->wstring (string)
-  (let* ((count (sb-alien:alien-funcall (sb-alien:extern-alien "MultiByteToWideChar" (function sb-alien:int sb-alien:int (integer 32) sb-alien:c-string sb-alien:int sb-alien:int sb-alien:int))
-                                        65001 0 string -1 0 0))
-         (ptr (sb-alien:make-alien sb-alien:short count)))
-    (sb-alien:alien-funcall (sb-alien:extern-alien "MultiByteToWideChar" (function sb-alien:int sb-alien:int (integer 32) sb-alien:c-string sb-alien:int (* T) sb-alien:int))
-                            65001 0 string -1 ptr count)
-    ptr))
-
-#+(and sbcl win32)
-(defun wstring->string (pointer)
-  (let* ((count (sb-alien:alien-funcall (sb-alien:extern-alien "WideCharToMultiByte" (function sb-alien:int sb-alien:int (integer 32) (* T) sb-alien:int sb-alien:int sb-alien:int sb-alien:int sb-alien:int))
-                                        65001 0 pointer -1 0 0 0 0))
-         (string (sb-alien:make-alien sb-alien:char count)))
-    (sb-alien:alien-funcall (sb-alien:extern-alien "WideCharToMultiByte" (function sb-alien:int sb-alien:int (integer 32) (* T) sb-alien:int (* T) sb-alien:int sb-alien:int sb-alien:int))
-                            65001 0 pointer -1 string count 0 0)
-    (prog1 (sb-alien:cast string sb-alien:c-string)
-      (sb-alien:free-alien string))))
+#+cffi
+(defun wstring->string (pointer &optional (chars -1))
+  (let ((bytes (cffi:foreign-funcall "WideCharToMultiByte" :int 65001 :int32 0 :pointer pointer :int chars :pointer (cffi:null-pointer) :int 0 :pointer (cffi:null-pointer) :pointer (cffi:null-pointer) :int)))
+    (cffi:with-foreign-object (string :uchar bytes)
+      (cffi:foreign-funcall "WideCharToMultiByte" :int 65001 :int32 0 :pointer pointer :int chars :pointer string :int bytes :pointer (cffi:null-pointer) :pointer (cffi:null-pointer) :int)
+      (let ((babel::*suppress-character-coding-errors* T))
+        (cffi:foreign-string-to-lisp string :encoding :utf-8)))))
+#+cffi
+(defun string->wstring (string &optional buffer)
+  (cffi:with-foreign-string (string string)
+    (let* ((chars (cffi:foreign-funcall "MultiByteToWideChar" :int 65001 :int32 0 :pointer string :int -1 :pointer (cffi:null-pointer) :int 0 :int))
+           (pointer (or buffer (cffi:foreign-alloc :uint16 :count chars))))
+      (cffi:foreign-funcall "MultiByteToWideChar" :int 65001 :int32 0 :pointer string :int -1 :pointer pointer :int chars :int)
+      pointer)))
 
 (defun runtime-directory ()
   (pathname-utils:to-directory
@@ -138,6 +134,102 @@
   #-(or allegro clozure digitool clisp cmucl scl lispworks sbcl)
   (apply #'directory directory args))
 
+#+cffi
+(cffi:defcstruct (dirent :class dirent :conc-name dirent-)
+  (inode :size)
+  (offset :size)
+  (length :uint16)
+  (type :uint8)
+  (name :char))
+
+#+cffi
+(defun dirent-path (entry)
+  (declare (type cffi:foreign-pointer entry))
+  (declare (optimize speed (safety 0)))
+  (let* ((off (cffi:foreign-slot-offset '(:struct dirent) 'name))
+         (name (cffi:inc-pointer entry off))
+         (maxlen (- (the (unsigned-byte 16) (dirent-length entry)) off))
+         (len (cffi:foreign-funcall "strnlen" :pointer name :size maxlen :size)))
+    ;; For whatever reason using CFFI's native string length counter
+    ;; breaks, so we use strnlen above, which works correctly.
+    (cffi:foreign-string-to-lisp name :count len :encoding :utf-8)))
+
+#+cffi
+(defun dotpathp (name)
+  (declare (type cffi:foreign-pointer name))
+  (declare (optimize speed (safety 0)))
+  ;; Check if the name is either "." or ".."
+  (or (= 0 (cffi:mem-aref name :char 0))
+      (and (= (char-code #\.) (cffi:mem-aref name :char 0))
+           (or (= 0 (cffi:mem-aref name :char 1))
+               (and (= (char-code #\.) (cffi:mem-aref name :char 1))
+                    (= 0 (cffi:mem-aref name :char 2)))))))
+
+#+cffi
+(defun fd-path (fd)
+  (declare (type fixnum fd))
+  (declare (optimize speed (safety 0)))
+  (cffi:with-foreign-objects ((path :char 1024))
+    (cffi:foreign-funcall "snprintf" :pointer path :size 1024 :string "/proc/self/fd/%i" :int fd)
+    (let ((size (cffi:foreign-funcall "readlink" :pointer path :pointer path :size 1024 :int)))
+      (when (< 0 size)
+        (cffi:foreign-string-to-lisp path :count size)))))
+
+(defun map-directory (function path &key (type T) recursive)
+  #-cffi
+  (dolist (entry (if recursive
+                     (merge-pathnames pathname-utils:*wild-inferiors* path)
+                     (merge-pathnames pathname-utils:*wild-file* path)))
+    (when (or (eql T type)
+              (and (eql :directory type) (directory-p entry))
+              (and (eql :file type) (file-p entry)))
+      (funcall function entry)))
+  #+cffi
+  (labels ((mapdir (fd dir)
+             (loop for entry = (cffi:foreign-funcall "readdir" :pointer dir :pointer)
+                   until (cffi:null-pointer-p entry)
+                   do (let ((name (cffi:foreign-slot-pointer entry '(:struct dirent) 'name)))
+                        (unless (dotpathp name)
+                          (labels ((dir (fd)
+                                     (when (or (eql type T) (eql type :directory))
+                                       (funcall function (fd-path fd)))
+                                     (when recursive
+                                       (opendir fd)))
+                                   (file ()
+                                     (when (or (eql type T) (eql type :file))
+                                       ;; TODO: we concat two strings here, it'd be a lot faster to only cons up one
+                                       (funcall function (format NIL "~a/~a" (fd-path fd) (dirent-path entry))))))
+                            (case (dirent-type entry)
+                              (0 ; Unknown, need to probe the actual file
+                               (let ((inner (cffi:foreign-funcall "openat" :int fd :pointer name :int 592128 :int)))
+                                 (if (= -1 inner)
+                                     (file)
+                                     (dir inner))))
+                              (4        ; Directory
+                               (dir (cffi:foreign-funcall "openat" :int fd :pointer name :int 592128 :int)))
+                              (8        ; Regular
+                               (file))))))))
+           (opendir (fd)
+             (let ((handle (cffi:foreign-funcall "fdopendir" :int fd :pointer)))
+               (if (cffi:null-pointer-p handle)
+                   (cffi:foreign-funcall "close" :int fd :int)
+                   (unwind-protect (mapdir fd handle)
+                     ;; Closedir closes the FD as well, so don't call close.
+                     (cffi:foreign-funcall "closedir" :pointer handle :int))))))
+    (let* ((path (pathname-utils:native-namestring path))
+           (fd (cffi:foreign-funcall "open" :string path :int 592128 :int)))
+      (if (= -1 fd)
+          (error "The file does not exist or is not accessible:~%  ~a" path)
+          (opendir fd)))))
+
+(defmacro do-directory ((file directory &key (type T) recursive return) &body body)
+  (let ((thunk (gensym "THUNK")))
+    `(block NIL
+       (flet ((,thunk (,file) ,@body))
+         (declare (dynamic-extent #',thunk))
+         (map-directory #',thunk ,directory :type ,type :recursive ,recursive)
+         ,return))))
+
 (defun list-contents (directory)
   ;; FIXME: This sucks
   (nconc (list-files directory)
@@ -175,18 +267,14 @@
 
 (defun list-devices (&optional host)
   (declare (ignore host))
-  #+(or windows win32 ms-windows)
-  (progn
-    #+sbcl (sb-alien:with-alien ((strings (array (integer 16) 1024)))
-             (let ((count (sb-alien:alien-funcall (sb-alien:extern-alien "GetLogicalDriveStringsW" (function (integer 32) (integer 32) (array (integer 16) 1024)))
-                                                  1024 strings))
-                   (base (sb-sys:sap-int (sb-alien:alien-sap strings)))
-                   (start 0)
-                   (devices ()))
-               (dotimes (i count devices)
-                 (when (= 0 (sb-alien:deref strings i))
-                   (push (string-right-trim ":\\" (wstring->string (sb-sys:int-sap (+ base (* 2 start))))) devices)
-                   (setf start (1+ i))))))))
+  #+(and cffi windows)
+  (cffi:with-foreign-objects ((strings :uint16 1024))
+    (let ((off 0)
+          (len (cffi:foreign-funcall "GetLogicalDriveStringsW" :int32 1024 :pointer strings :int32)))
+      (loop for str = (wstring->string (cffi:inc-pointer strings (* 2 off)))
+            collect (string-right-trim ":\\" str)
+            do (incf off (1+ (length str)))
+            while (< off len)))))
 
 (defun device (pathname)
   (or (pathname-device pathname)
@@ -240,16 +328,18 @@
             (namestring (merge-pathnames (resolve-symbolic-links (pathname-utils:to-directory file)) file))))
 
 (defun create-symbolic-link (link-file destination-file)
-  #-sbcl (declare (ignore link-file destination-file))
-  #+(and sbcl unix) (sb-posix:symlink destination-file link-file)
-  #+(and sbcl win32) (let ((src (string->wstring (pathname-utils:native-namestring link-file)))
-                           (dst (string->wstring (pathname-utils:native-namestring destination-file))))
-                       (unwind-protect (when (= 0 (sb-alien:alien-funcall (sb-alien:extern-alien "CreateSymbolicLinkW" (function (integer 32) (* (integer 16)) (* (integer 16)) (integer 32)))
-                                                                          src dst (if (directory-p destination-file) #x3 #x2)))
-                                         (error "Failed to create symlink."))
-                         (sb-alien:free-alien src)
-                         (sb-alien:free-alien dst)))
-  #-sbcl (error "Cannot create symbolic links."))
+  #+(and cffi unix)
+  (unless (= 0 (cffi:foreign-funcall "symlink" :string destination-file :string link-file :int))
+    (error "Failed to create symlink."))
+  #+(and cffi win32)
+  (let ((src (string->wstring (pathname-utils:native-namestring link-file)))
+        (dst (string->wstring (pathname-utils:native-namestring destination-file))))
+    (unwind-protect (when (= 0 (cffi:foreign-funcall "CreateSymbolicLinkW" :pointer src :pointer dst :int32 (if (directory-p destination-file) #x3 #x2) :int32))
+                      (error "Failed to create symlink."))
+      (cffi:foreign-free src)
+      (cffi:foreign-free dst)))
+  #-cffi (declare (ignore link-file destination-file))
+  #-cffi (error "Cannot create symbolic links."))
 
 (defun rename-file* (file to)
   (let ((file (pathname-utils:to-physical file))

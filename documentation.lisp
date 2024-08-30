@@ -71,6 +71,42 @@ See DELETE-FILE*")
 
 Like CL:DIRECTORY, but tries *not* to resolve any symlinks of the
 listing, returning direct descendants of the directory root.")
+
+  (function map-directory
+    "Iterates over the file entries of the directory.
+
+FUNCTION is called for entries in the directory given by PATH.
+
+If RECURSIVE is true, the function will be called for entries
+recursively until all directories in the tree with PATH as its root
+have been mapped.
+
+TYPE governs for which kinds of file entries the function is called.
+
+  T          --- Both file and directory entries
+  :FILE      --- Only \"regular\" file entries
+  :DIRECTORY --- Only directory entries
+
+No guarantees are made about the order in which file entries are
+mapped.
+
+On platforms with CFFI support this is usually far more efficient than
+using the DIRECTORY function with a wild pathname, especially if
+you're only interested in a particular few files after which the
+search can be aborted early.
+
+On platforms without CFFI support DIRECTORY is used, and this may
+simply be a more convenient way of iterating over directories.
+
+See DO-DIRECTORY")
+
+  (function do-directory
+    "Convenience iteration macro around MAP-DIRECTORY.
+
+BODY is evaluated in a NIL block. If iteration terminates normally,
+RETURN is evaluated and its values returned from DO-DIRECTORY.
+
+See MAP-DIRECTORY")
   
   (function list-contents
     "Lists all files and directories within DIRECTORY.

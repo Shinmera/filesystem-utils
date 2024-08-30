@@ -13,6 +13,8 @@
    #:truename*
    #:file-exists-p
    #:directory*
+   #:map-directory
+   #:do-directory
    #:list-contents
    #:list-files
    #:list-directories
