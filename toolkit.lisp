@@ -73,7 +73,7 @@
   #+gcl (let ((*default-pathname-defaults* #p"")) (truename #p""))
   #+lispworks (hcl:get-working-directory)
   #+mkcl (mk-ext:getcwd)
-  #+sbcl (sb-ext:parse-native-namestring (sb-unix:posix-getcwd/))
+  #+sbcl (parse-native-namestring (sb-posix:getcwd) :as :directory)
   #+xcl (extensions:current-directory)
   #-(or abcl genera xcl allegro clisp clozure cmucl scl cormanlisp clasp ecl gcl lispworks mkcl sbcl xcl)
   (truename *default-pathname-defaults*))
