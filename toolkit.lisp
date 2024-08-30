@@ -203,6 +203,8 @@
   (wstring->string (cffi:foreign-slot-pointer data '(:struct find-data) 'name)))
 
 (defun map-directory (function path &key (type T) recursive)
+  (unless (pathname-utils:directory-p path)
+    (error "The path is not a directory pathname."))
   #-cffi
   (dolist (entry (if recursive
                      (merge-pathnames pathname-utils:*wild-inferiors* path)
