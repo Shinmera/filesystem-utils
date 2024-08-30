@@ -205,14 +205,6 @@
 (defun map-directory (function path &key (type T) recursive)
   (unless (pathname-utils:directory-p path)
     (error "The path is not a directory pathname."))
-  #-cffi
-  (dolist (entry (if recursive
-                     (merge-pathnames pathname-utils:*wild-inferiors* path)
-                     (merge-pathnames pathname-utils:*wild-file* path)))
-    (when (or (eql T type)
-              (and (eql :directory type) (directory-p entry))
-              (and (eql :file type) (file-p entry)))
-      (funcall function entry)))
   #+(and cffi windows)
   (cffi:with-foreign-objects ((data '(:struct find-data)))
     (labels ((mapdir (path)
@@ -274,7 +266,15 @@
            (fd (cffi:foreign-funcall "open" :string path :int 592128 :int)))
       (if (= -1 fd)
           (error "The file does not exist or is not accessible:~%  ~a" path)
-          (opendir fd)))))
+          (opendir fd))))
+  #-(and cffi (or unix windows))
+  (dolist (entry (if recursive
+                     (merge-pathnames pathname-utils:*wild-inferiors* path)
+                     (merge-pathnames pathname-utils:*wild-file* path)))
+    (when (or (eql T type)
+              (and (eql :directory type) (directory-p entry))
+              (and (eql :file type) (file-p entry)))
+      (funcall function entry))))
 
 (defmacro do-directory ((file directory &key (type T) recursive return) &body body)
   (let ((thunk (gensym "THUNK")))
