@@ -161,7 +161,7 @@
     ;; breaks, so we use strnlen above, which works correctly.
     (cffi:foreign-string-to-lisp name :count len :encoding :utf-8)))
 
-#+cffi
+#+(and unix cffi)
 (defun dotpathp (name)
   (declare (type cffi:foreign-pointer name))
   (declare (optimize speed (safety 0)))
@@ -195,6 +195,17 @@
   (reserved-1 :uint32)
   (name :uint16 :count 260)
   (alternate-name :uint16 :count 14))
+
+#+(and windows cffi)
+(defun dotpathp (name)
+  (declare (type cffi:foreign-pointer name))
+  (declare (optimize speed (safety 0)))
+  ;; Check if the name is either "." or ".."
+  (or (= 0 (cffi:mem-aref name :uint16 0))
+      (and (= (char-code #\.) (cffi:mem-aref name :uint16 0))
+           (or (= 0 (cffi:mem-aref name :uint16 1))
+               (and (= (char-code #\.) (cffi:mem-aref name :uint16 1))
+                    (= 0 (cffi:mem-aref name :char 2)))))))
 
 #+(and windows cffi)
 (defun find-path (data)
