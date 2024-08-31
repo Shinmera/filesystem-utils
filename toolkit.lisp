@@ -268,9 +268,9 @@
           (error "The file does not exist or is not accessible:~%  ~a" path)
           (opendir fd))))
   #-(and cffi (or unix windows))
-  (dolist (entry (if recursive
-                     (merge-pathnames pathname-utils:*wild-inferiors* path)
-                     (merge-pathnames pathname-utils:*wild-file* path)))
+  (dolist (entry (directory (if recursive
+                                (merge-pathnames pathname-utils:*wild-inferiors* path)
+                                (merge-pathnames pathname-utils:*wild-file* path))))
     (when (or (eql T type)
               (and (eql :directory type) (directory-p entry))
               (and (eql :file type) (file-p entry)))
