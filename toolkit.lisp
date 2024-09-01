@@ -297,15 +297,14 @@
          (map-directory #',thunk ,directory :type ,type :recursive ,recursive)
          ,return))))
 
-(defun list-contents (directory)
+(defun list-contents (directory &key recursive)
   (let ((directory (pathname-utils:to-directory directory)))
-    #+cffi
     (let ((files ()))
-      (do-directory (file directory :type T :return files)
-        (push (pathname-utils:parse-native-namestring file) files)))
-    #-cffi
-    (nconc (list-files directory)
-           (list-directories directory))))
+      (do-directory (file directory :type T :recursive recursive :return files)
+        (push (etypecase file
+                (string (pathname-utils:parse-native-namestring file))
+                (pathname file))
+              files)))))
 
 (defun list-files (directory)
   (let ((directory (pathname-utils:to-directory directory)))
