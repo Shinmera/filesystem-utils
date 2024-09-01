@@ -75,7 +75,8 @@ listing, returning direct descendants of the directory root.")
   (function map-directory
     "Iterates over the file entries of the directory.
 
-FUNCTION is called for entries in the directory given by PATH.
+FUNCTION is called for entries in the directory given by PATH. The
+entry may either be a truename string or a pathname.
 
 If RECURSIVE is true, the function will be called for entries
 recursively until all directories in the tree with PATH as its root
@@ -111,6 +112,9 @@ See MAP-DIRECTORY")
   
   (function list-contents
     "Lists all files and directories within DIRECTORY.
+
+If RECURSIVE is true, does so recursively for the entire directory
+structure.
 
 See DIRECTORY*")
   
