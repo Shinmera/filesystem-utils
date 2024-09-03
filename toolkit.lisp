@@ -252,8 +252,9 @@
                           (labels ((dir (fd)
                                      (when (or (eql type T) (eql type :directory))
                                        (funcall function (fd-path fd)))
-                                     (when recursive
-                                       (opendir fd)))
+                                     (if recursive
+                                         (opendir fd)
+                                         (cffi:foreign-funcall "close" :int fd :int)))
                                    (file ()
                                      (when (or (eql type T) (eql type :file))
                                        ;; TODO: we concat two strings here, it'd be a lot faster to only cons up one
