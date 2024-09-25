@@ -429,7 +429,7 @@
         (to (merge-pathnames (pathname-utils:to-physical to)
                              (make-pathname :name :unspecific :type :unspecific))))
     (cond ((pathname-utils:pathname= file to))
-          ((equal (device file) (device to))
+          ((equal (device file) (device (pathname-utils:to-directory to)))
            #+clisp
            (progn (funcall 'require "syscalls")
                   (funcall (find-symbol (string :copy-file) :posix) file to :method :rename))
