@@ -251,7 +251,9 @@
                         (unless (dotpathp name)
                           (labels ((dir (fd)
                                      (when (or (eql type T) (eql type :directory))
-                                       (funcall function (fd-path fd)))
+                                       (let ((path (fd-path fd)))
+                                         (when path
+                                           (funcall function path))))
                                      (if recursive
                                          (opendir fd)
                                          (cffi:foreign-funcall "close" :int fd :int)))
