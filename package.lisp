@@ -27,6 +27,7 @@
    #:file-p
    #:symbolic-link-p
    #:create-symbolic-link
+   #:create-hard-link
    #:rename-file*
    #:copy-file
    #:empty-directory-p

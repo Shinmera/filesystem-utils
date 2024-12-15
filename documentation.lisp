@@ -206,6 +206,14 @@ This may signal an error for a variety of reasons:
 - The implementation does not support creating symbolic links
 - The implementation is not permitted to create symbolic links
 - The target filesystem cannot be pointed to")
+
+  (function create-hard-link
+    "Attempts to create a hard link file at LINK-FILE, pointing to DESTINATION-FILE.
+
+This may signal an error for a variety of reasons:
+- The implementation does not support creating hard links
+- The implementation is not permitted to create hard links
+- The target filesystem cannot be pointed to")
   
   (function rename-file*
     "Renames FILE to TO, overwriting TO if it exists.
