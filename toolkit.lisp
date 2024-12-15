@@ -364,8 +364,10 @@
 (defun device (pathname)
   (or (pathname-device pathname)
       ;; FIXME: Implement on more implementations
-      #+(or posix linux bsd)
-      (progn #+sbcl (sb-posix:stat-dev (sb-posix:stat pathname)))))
+      #+(or posix unix linux bsd)
+      (progn #+ccl (nth-value 9 (ccl::%stat (native-namestring pathname)))
+             #+cmucl (nth-value 1 (unix:unix-stat (native-namestring pathname)))
+             #+sbcl (sb-posix:stat-dev (sb-posix:stat pathname)))))
 
 (defun resolve-symbolic-links (pathname)
   #-allegro
