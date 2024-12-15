@@ -149,7 +149,11 @@ The HOST may be given as a hint for devices to list under the given
 host. The implementation may disregard this hint, however.
 
 This may return NIL if the implementation cannot enumerate the
-devices.")
+devices.
+
+On Windows, this returns a list of pathnames with the PATHNAME-DEVICE
+set accordingly. On Unix systems, this returns a list of pathnames
+with the PATHNAME-DIRECTORY set to the mount point of the filesystem.")
 
   (function device
     "Attempts to fetch an identifier for the actual device this file is on.

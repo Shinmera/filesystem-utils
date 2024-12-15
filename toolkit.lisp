@@ -350,6 +350,15 @@
   (when (pathname-host *default-pathname-defaults*)
     (list (pathname-host *default-pathname-defaults*))))
 
+#+(and cffi unix)
+(cffi:defcstruct (mntent :conc-name mntent-)
+  (name :string)
+  (directory :string)
+  (type :string)
+  (options :string)
+  (frequency :int)
+  (pass-number :int))
+
 (defun list-devices (&optional host)
   (declare (ignore host))
   #+(and cffi windows)
@@ -359,7 +368,16 @@
       (loop for str = (wstring->string (cffi:inc-pointer strings (* 2 off)))
             collect (string-right-trim ":\\" str)
             do (incf off (1+ (length str)))
-            while (< off len)))))
+            while (< off len))))
+  #+(and cffi unix)
+  (let ((mnt (cffi:foreign-funcall "setmntent" :string "/etc/mtab" :string "r" :pointer)))
+    (unless (cffi:null-pointer-p mnt)
+      (unwind-protect
+           (loop for mntent = (cffi:foreign-funcall "getmntent" :pointer mnt :pointer)
+                 until (cffi:null-pointer-p mntent)
+                 collect (pathname-utils:parse-native-namestring
+                          (mntent-directory mntent) :as :directory))
+        (cffi:foreign-funcall "endmntent" :pointer mnt)))))
 
 (defun device (pathname)
   (or (pathname-device pathname)
