@@ -2,6 +2,7 @@
 (defpackage #:org.shirakumo.filesystem-utils
   (:use #:cl)
   (:local-nicknames (#:pathname-utils #:org.shirakumo.pathname-utils))
+  (:import-from #:org.shirakumo.pathname-utils #:native-namestring)
   (:export
    #:runtime-directory
    #:temporary-directory
