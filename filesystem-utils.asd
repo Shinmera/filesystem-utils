@@ -4,9 +4,9 @@
   :author "Yukari Hafner <shinmera@tymoon.eu>"
   :maintainer "Yukari Hafner <shinmera@tymoon.eu>"
   :description "A collection of utilities for filesystem interaction."
-  :homepage "https://Shinmera.github.io/filesystem-utils/"
-  :bug-tracker "https://github.com/Shinmera/filesystem-utils/issues"
-  :source-control (:git "https://github.com/Shinmera/filesystem-utils.git")
+  :homepage "https://shinmera.com/docs/filesystem-utils/"
+  :bug-tracker "https://shinmera.com/project/filesystem-utils/issues"
+  :source-control (:git "https://shinmera.com/project/filesystem-utils.git")
   :serial T
   :components ((:file "package")
                (:file "toolkit")

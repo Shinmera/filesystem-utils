@@ -4,9 +4,9 @@
   :author "Yukari Hafner <shinmera@tymoon.eu>"
   :maintainer "Yukari Hafner <shinmera@tymoon.eu>"
   :description "Tests for the filesystem-utils system."
-  :homepage "https://Shinmera.github.io/filesystem-utils/"
-  :bug-tracker "https://github.com/Shinmera/filesystem-utils/issues"
-  :source-control (:git "https://github.com/Shinmera/filesystem-utils.git")
+  :homepage "https://shinmera.com/docs/filesystem-utils/"
+  :bug-tracker "https://shinmera.com/project/filesystem-utils/issues"
+  :source-control (:git "https://shinmera.com/project/filesystem-utils.git")
   :serial T
   :components ((:file "test"))
   :depends-on (:filesystem-utils :parachute)
